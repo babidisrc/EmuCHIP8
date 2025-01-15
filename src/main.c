@@ -1,14 +1,17 @@
 #include "raylib.h"
+
+#include <string.h>
 #include <stdint.h>
+#include <math.h>
 
 #define WIDTH 64
 #define HEIGHT 32
 
-uint8_t display[HEIGHT][WIDTH] = {0}; // 64x32
+uint8_t display[HEIGHT * WIDTH] = {0}; // 64x32
 
-int GetChip8Key() {
-    if (IsKeyPressed(KEY_ONE)) return 0x1;
-    if (IsKeyPressed(KEY_TWO)) return 0x2;
+int GetKey() {
+    if (IsKeyPressed(KEY_ONE)) return 0x1; 
+    if (IsKeyPressed(KEY_TWO)) return 0x2; 
     if (IsKeyPressed(KEY_THREE)) return 0x3;
     if (IsKeyPressed(KEY_FOUR)) return 0xC;
     if (IsKeyPressed(KEY_Q)) return 0x4;
@@ -26,15 +29,39 @@ int GetChip8Key() {
     return -1; 
 }
 
-void RenderDisplay(uint8_t d[][WIDTH]) {
-    const int scale = 10;
-    for (int y = 0; y < HEIGHT; y++) {
-        for (int x = 0; x < WIDTH; x++) {
-            if (d[y][x] == 1) {
-                DrawRectangle(x * scale, y * scale, scale, scale, WHITE);
-            }
-        }
-    }
+void setPixel(uint8_t *d, int x, int y) {
+	// pixel wrap around to the opposite side if outside of bounds
+	if (x > WIDTH) x -= WIDTH;
+	else if (x < 0) x += WIDTH;
+	if (y > HEIGHT)	y -= HEIGHT;
+	else if (y < 0) y += HEIGHT;
+	
+	int pixelLoc = x + (y * WIDTH);
+
+	d[pixelLoc] ^= 1; // sprites are XORed onto display
+}
+
+void clear(uint8_t *d) {
+	memset(d, 0, HEIGHT * WIDTH);
+}
+
+void render(uint8_t d[WIDTH * HEIGHT]) {
+	const int scale = 10;
+	ClearBackground(BLACK); // clean screen
+
+	for (int i = 0; i < WIDTH * HEIGHT; i++) {
+		int x = (i % WIDTH) * scale;
+		int y = floor(i / HEIGHT) * scale;
+
+		if (display[i]) {
+			DrawRectangle(x, y, scale, scale, WHITE);
+		}
+	}
+}
+
+void testRender() {
+    setPixel(display, 0, 0);
+    setPixel(display, 5, 2);
 }
 
 int main() {
@@ -44,10 +71,12 @@ int main() {
     InitWindow(screenWidth, screenHeight, "CHIP-8 Emulator");
     SetTargetFPS(60);
 
+	testRender();
+
     while (!WindowShouldClose()) {
         BeginDrawing();
-        ClearBackground(BLACK);
-        RenderDisplay(display);
+		render(display);
+		
         EndDrawing();
     }
 
