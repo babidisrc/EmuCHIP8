@@ -22,71 +22,65 @@
 
 uint8_t memory[MEMORY_SIZE];  
 
-uint16_t stack[16];
+uint16_t stack[16] = {0};
 uint8_t sp = 0; // stack pointer
+
+unsigned char keypad[16] = {0};
 
 uint8_t display[HEIGHT * WIDTH] = {0}; // 64x32
 
 uint8_t stopLoop = 0; // stop looping (e.g. IBM Logo)
 
 // REGISTERS
-uint8_t V[16]; 
-uint8_t soundTimer, delayTimer;
-uint16_t I;
+uint8_t V[16] = {0}; 
+uint8_t soundTimer = 0, delayTimer = 0;
+uint16_t I = 0;
+
+// Built-in font
+unsigned char fontset[80] = {
+    0xF0, 0x90, 0x90, 0x90, 0xF0,  // 0
+    0x20, 0x60, 0x20, 0x20, 0x70,  // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0,  // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0,  // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10,  // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0,  // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0,  // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40,  // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0,  // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0,  // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90,  // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0,  // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0,  // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0,  // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0,  // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80   // F
+};
+
+// keymaps
+int keymappings[16] = {
+    KEY_ONE,    // 0x0 (1)
+    KEY_TWO,    // 0x1 (2)
+    KEY_THREE,  // 0x2 (3)
+    KEY_FOUR,   // 0x3 (4)
+    KEY_Q,      // 0x4 (Q)
+    KEY_W,      // 0x5 (W)
+    KEY_E,      // 0x6 (E)
+    KEY_R,      // 0x7 (R)
+    KEY_A,      // 0x8 (A)
+    KEY_S,      // 0x9 (S)
+    KEY_D,      // 0xA (D)
+    KEY_F,      // 0xB (F)
+    KEY_Z,      // 0xC (Z)
+    KEY_X,      // 0xD (X)
+    KEY_C,      // 0xE (C)
+    KEY_V       // 0xF (V)
+};
 
 void initializeMemory() {
     memset(memory, 0, MEMORY_SIZE);
 
-    int i = 0;
-
-    // Built-in font
-    uint8_t digit0[] = {0xF0, 0x90, 0x90, 0x90, 0xF0}; // sprite digit 0
-    memcpy(&memory[i], digit0, sizeof(digit0));
-
-    uint8_t digit1[] = {0x20, 0x60, 0x20, 0x20, 0x70}; // sprite digit 1
-    memcpy(&memory[i += 5], digit1, sizeof(digit1));
-
-    uint8_t digit2[] = {0xF0, 0x10, 0xF0, 0x80, 0xF0}; // sprite digit 2
-    memcpy(&memory[i += 5], digit2, sizeof(digit2));
-
-    uint8_t digit3[] = {0xF0, 0x10, 0xF0, 0x10, 0xF0}; // sprite digit 3
-    memcpy(&memory[i += 5], digit3, sizeof(digit3));
-
-    uint8_t digit4[] = {0x90, 0x90, 0xF0, 0x10, 0x10}; // sprite digit 4
-    memcpy(&memory[i += 5], digit4, sizeof(digit4));
-
-    uint8_t digit5[] = {0xF0, 0x80, 0xF0, 0x10, 0xF0}; // sprite digit 5
-    memcpy(&memory[i += 5], digit5, sizeof(digit5));
-
-    uint8_t digit6[] = {0xF0, 0x80, 0xF0, 0x90, 0xF0}; // sprite digit 6
-    memcpy(&memory[i += 5], digit6, sizeof(digit6));
-
-    uint8_t digit7[] = {0xF0, 0x10, 0x20, 0x40, 0x40}; // sprite digit 7
-    memcpy(&memory[i += 5], digit7, sizeof(digit7));
-
-    uint8_t digit8[] = {0xF0, 0x90, 0xF0, 0x90, 0xF0}; // sprite digit 8
-    memcpy(&memory[i += 5], digit8, sizeof(digit8));
-
-    uint8_t digit9[] = {0xF0, 0x90, 0xF0, 0x10, 0xF0}; // sprite digit 9
-    memcpy(&memory[i += 5], digit9, sizeof(digit9));
-
-    uint8_t letterA[] = {0xF0, 0x90, 0xF0, 0x90, 0x90}; // sprite letter A
-    memcpy(&memory[i += 5], letterA, sizeof(letterA));
-
-    uint8_t letterB[] = {0xE0, 0x90, 0xE0, 0x90, 0xE0}; // sprite letter B
-    memcpy(&memory[i += 5], letterB, sizeof(letterB));
-
-    uint8_t letterC[] = {0xF0, 0x80, 0x80, 0x80, 0xF0}; // sprite letter C
-    memcpy(&memory[i += 5], letterC, sizeof(letterC));
-
-    uint8_t letterD[] = {0xE0, 0x90, 0x90, 0x90, 0xE0}; // sprite letter D
-    memcpy(&memory[i += 5], letterD, sizeof(letterD));
-
-    uint8_t letterE[] = {0xF0, 0x80, 0xF0, 0x80, 0xF0}; // sprite letter E
-    memcpy(&memory[i += 5], letterE, sizeof(letterE));
-
-    uint8_t letterF[] = {0xF0, 0x80, 0xF0, 0x80, 0x80}; // sprite letter F
-    memcpy(&memory[i += 5], letterF, sizeof(letterF));
+    // load fonts into memory
+    memcpy(memory, fontset, sizeof(fontset));
 }
 
 void initializeRegisters() {
@@ -100,7 +94,7 @@ void pushStack(uint16_t addr) {
     if (sp < 16) {
         stack[sp++] = addr;
     } else {
-        // Handle stack overflow
+        // handle stack overflow
     }
 }
 
@@ -108,54 +102,16 @@ uint16_t popStack() {
     if (sp > 0) {
         return stack[--sp];
     } else {
-        // Handle stack underflow
+        // handle stack underflow
         return 0;
     }
 }
 
-// (Ex9E, ExA1)
-int GetKey() {
-    if (IsKeyDown(KEY_ONE)) return 0x1; 
-    if (IsKeyDown(KEY_TWO)) return 0x2; 
-    if (IsKeyDown(KEY_THREE)) return 0x3;
-    if (IsKeyDown(KEY_FOUR)) return 0xC;
-    if (IsKeyDown(KEY_Q)) return 0x4;
-    if (IsKeyDown(KEY_W)) return 0x5;
-    if (IsKeyDown(KEY_E)) return 0x6;
-    if (IsKeyDown(KEY_R)) return 0xD;
-    if (IsKeyDown(KEY_A)) return 0x7;
-    if (IsKeyDown(KEY_S)) return 0x8;
-    if (IsKeyDown(KEY_D)) return 0x9;
-    if (IsKeyDown(KEY_F)) return 0xE;
-    if (IsKeyDown(KEY_Z)) return 0xA;
-    if (IsKeyDown(KEY_X)) return 0x0;
-    if (IsKeyDown(KEY_C)) return 0xB;
-    if (IsKeyDown(KEY_V)) return 0xF;
-
-    return -1; 
-}
-
-// (Fx0A)
-int WaitKey() {
-    int key = GetKeyPressed();
-    if (key == (KEY_ONE)) return 0x1; 
-    if (key == (KEY_TWO)) return 0x2; 
-    if (key == (KEY_THREE)) return 0x3;
-    if (key == (KEY_FOUR)) return 0xC;
-    if (key == (KEY_Q)) return 0x4;
-    if (key == (KEY_W)) return 0x5;
-    if (key == (KEY_E)) return 0x6;
-    if (key == (KEY_R)) return 0xD;
-    if (key == (KEY_A)) return 0x7;
-    if (key == (KEY_S)) return 0x8;
-    if (key == (KEY_D)) return 0x9;
-    if (key == (KEY_F)) return 0xE;
-    if (key == (KEY_Z)) return 0xA;
-    if (key == (KEY_X)) return 0x0;
-    if (key == (KEY_C)) return 0xB;
-    if (key == (KEY_V)) return 0xF;
-
-    return -1;
+void keyHandler(unsigned char *kpad) {
+    // updating the keypad with the current state
+    for (int keycode = 0; keycode < 16; keycode++) {
+        kpad[keycode] = IsKeyDown(keymappings[keycode]);
+    }
 }
 
 void setPixel(uint8_t *d, int x, int y, int n) {
@@ -209,10 +165,15 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
     unsigned char *code = &codebuffer[*pc - PROGRAM_START];
 
     int opbytes = 2;
-    int skipNext = 2;
 
     // combine 2 bytes in one 16-bit opcode
     int opcode = (code[0] << 8) | code[1];
+
+    // Vx register, we are basically "grabbing" the x present in some
+    unsigned short x = (opcode & 0x0F00) >> 8;
+
+    // Vy register, we are basically "grabbing" the y present in some
+    unsigned short y = (opcode & 0x00F0) >> 4;
 
     printf ("%04x: %04x -> ", *pc, opcode);
 
@@ -234,90 +195,90 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
             return 0;
             break;
         case 0x3000: // skip next instruction if Vx == kk
-            printf("SE V%01x, 0x%02x", (opcode & 0x0F00) >> 8, (opcode & 0x00FF)); 
-            if (V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
-                *pc += skipNext;
+            printf("SE V%01x, 0x%02x", x, (opcode & 0x00FF)); 
+            if (V[x] == (opcode & 0x00FF))
+                *pc += opbytes;
             break;
         case 0x4000: // skip next instruction if Vx != kk
-            printf("SNE V%01x, 0x%02x", (opcode & 0x0F00) >> 8, (opcode & 0x00FF)); 
-            if (V[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF))
-                *pc += skipNext;
+            printf("SNE V%01x, 0x%02x", x, (opcode & 0x00FF)); 
+            if (V[x] != (opcode & 0x00FF))
+                *pc += opbytes;
             break;
         case 0x5000: // skip next instruction if Vx == Vy
-            printf("SE V%01x, V%1x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 8); 
-            if (V[(opcode & 0x0F00) >> 8] == V[(opcode & 0x00F0) >> 4])
-                *pc += skipNext;
+            printf("SE V%01x, V%1x", x, y); 
+            if (V[x] == V[y])
+                *pc += opbytes;
             break;
         case 0x6000: // set Vx = kk
-            printf("LD V%01x, 0x%02x", (opcode & 0x0F00) >> 8, (opcode & 0x00FF)); 
-            V[(opcode & 0x0F00) >> 8] = (opcode & 0x00FF);
+            printf("LD V%01x, 0x%02x", x, (opcode & 0x00FF)); 
+            V[x] = (opcode & 0x00FF);
             break;
         case 0x7000: // set Vx = Vx + kk
-            printf("ADD V%01x, 0x%02x", (opcode & 0x0F00) >> 8, (opcode & 0x00FF)); 
-            V[(opcode & 0x0F00) >> 8] = (V[(opcode & 0x0F00) >> 8] + (opcode & 0x00FF)) & 0xFF;
+            printf("ADD V%01x, 0x%02x", x, (opcode & 0x00FF)); 
+            V[x] = (V[x] + (opcode & 0x00FF)) & 0xFF;
             break;
         case 0x8000:
             switch (opcode & 0x000F) { // isolate the last nibble
                 case 0x0000: // set Vx = Vy
-                    printf("LD V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4];
+                    printf("LD V%01x, V%01x", x, y);
+                    V[x] = V[y];
                     break;
                 case 0x0001: // set Vx OR Vy
-                    printf("OR V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    V[(opcode & 0x0F00) >> 8] |= V[(opcode & 0x00F0) >> 4];
+                    printf("OR V%01x, V%01x", x, y);
+                    V[x] |= V[y];
                     break;
                 case 0x0002: // set Vx AND Vy
-                    printf("AND V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    V[(opcode & 0x0F00) >> 8] &= V[(opcode & 0x00F0) >> 4];
+                    printf("AND V%01x, V%01x", x, y);
+                    V[x] &= V[y];
                     break;
                 case 0x0003: // set Vx XOR Vy
-                    printf("XOR V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    V[(opcode & 0x0F00) >> 8] ^= V[(opcode & 0x00F0) >> 4];
+                    printf("XOR V%01x, V%01x", x, y);
+                    V[x] ^= V[y];
                     break;
                 case 0x0004: // set Vx = Vx + Vy, set VF = carry
-                    printf("ADD V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    V[(opcode & 0x0F00) >> 8] += V[(opcode & 0x00F0) >> 4];
-                    if (V[(opcode & 0x0F00) >> 8] > 0xFF) {
+                    printf("ADD V%01x, V%01x", x, y);
+                    V[x] += V[y];
+                    if (V[x] > 0xFF) {
                         V[0xF] = 1;
                     } else {
                         V[0xF] = 0;
                     }
                     break;
                 case 0x0005: // set Vx = Vx - Vy, set VF = NOT borrow
-                    printf("SUB V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    V[(opcode & 0x0F00) >> 8] -= V[(opcode & 0x00F0) >> 4];
-                    if (V[(opcode & 0x0F00) >> 8] > V[(opcode & 0x00F0) >> 4]) {
+                    printf("SUB V%01x, V%01x", x, y);
+                    V[x] -= V[y];
+                    if (V[x] > V[y]) {
                         V[0xF] = 1;
                     } else {
                         V[0xF] = 0;
                     }
                     break;
                 case 0x0006: // Vx = Vx SHR 1
-                    printf("SHR V%01x {, V%01x}", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    V[0xF] = V[(opcode & 0x0F00) >> 8] & 0x01;
-                    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x0F00) >> 8] >> 1;
+                    printf("SHR V%01x {, V%01x}", x, y);
+                    V[0xF] = V[x] & 0x01;
+                    V[x] = V[x] >> 1;
                     break;
                 case 0x0007: // set Vx = Vy - Vx, set VF = NOT borrow
-                    printf("SUBN V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    if (V[(opcode & 0x00F0) >> 4] > V[(opcode & 0x0F00) >> 8]) {
+                    printf("SUBN V%01x, V%01x", x, y);
+                    if (V[y] > V[x]) {
                         V[0xF] = 1;
                     } else {
                         V[0xF] = 0;
                     }
                     break;
                 case 0x000E: // Vx = Vx SHL 1
-                    printf("SHL V%01x {, V%01x}", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4);
-                    uint8_t VX = V[(opcode & 0x0F00) >> 8];
+                    printf("SHL V%01x {, V%01x}", x, y);
+                    uint8_t VX = V[x];
                     V[0xF] = VX & 0x01;
-                    V[(opcode & 0x0F00) >> 8] = VX << 1;
+                    V[x] = VX << 1;
                     break;
                 default: printf("UNKNOWN"); break;
             } 
             break;
         case 0x9000: // skip next instruction if Vx != Vy
-            printf("SNE V%01x, V%01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4); 
-            if (V[(opcode & 0x0F00) >> 8] != V[(opcode & 0x00F0) >> 4])
-                *pc += skipNext;
+            printf("SNE V%01x, V%01x", x, y); 
+            if (V[x] != V[y])
+                *pc += opbytes;
             break;
         case 0xA000: // set I = nnn
             printf("LD I, 0x%03x", (opcode & 0x0FFF));
@@ -329,25 +290,25 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
             return 0;
             break;
         case 0xC000: // set Vx = random byte (0-255) AND kk
-            printf("RND V%01x, 0x%03x", (opcode & 0x0F00) >> 8, opcode & 0x00FF); 
-            V[(opcode & 0x0F00) >> 8] = (rand() % 256) & (opcode & 0x00FF);
+            printf("RND V%01x, 0x%03x", x, opcode & 0x00FF); 
+            V[x] = (rand() % 256) & (opcode & 0x00FF);
             break;
         case 0xD000: // display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision
-            printf("DRW V%01x, V%01x, %01x", (opcode & 0x0F00) >> 8, (opcode & 0x00F0) >> 4, (opcode & 0x00F)); 
-            setPixel(display, V[(opcode & 0x0F00) >> 8], V[(opcode & 0x00F0) >> 4], (opcode & 0x00F));
+            printf("DRW V%01x, V%01x, %01x", x, y, (opcode & 0x00F)); 
+            setPixel(display, V[x], V[y], (opcode & 0x00F));
             break;
         case 0xE000:
             switch (opcode & 0x00FF) {
                 case 0x009E: // skip next instruction if key with the value of Vx is pressed
-                    printf("SKP V%01x", (opcode & 0x0F00) >> 8);
-                    if(GetKey() == V[(opcode & 0x0F00) >> 8]) {
-                        *pc += skipNext;
+                    printf("SKP V%01x", x);
+                    if (keypad[V[x]]) {
+                        *pc += opbytes;
                     }
                     break;
                 case 0x00A1: // skip next instruction if key with the value of Vx is NOT pressed
-                    printf("SKNP V%01x", (opcode & 0x0F00) >> 8);
-                    if(GetKey() != V[(opcode & 0x0F00) >> 8]) {
-                        *pc += skipNext;
+                    printf("SKNP V%01x", x);
+                    if (!keypad[V[x]]) {
+                        *pc += opbytes;
                     }
                     break;
                 default: printf("UNKNOWN"); break;
@@ -356,29 +317,30 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
         case 0xF000:
             switch (opcode & 0x00FF) {
                 case 0x0007: // set Vx = delay timer value
-                    printf("LD V%01x, DT", (opcode & 0x0F00) >> 8);
-                    V[(opcode & 0x0F00) >> 8] = delayTimer;
+                    printf("LD V%01x, DT", x);
+                    V[x] = delayTimer;
                     break;
                 case 0x000A: // wait for a key press, store the value of the key in Vx
-                    printf("LD V%01x, K", (opcode & 0x0F00) >> 8);
-                    int key = WaitKey(); 
-                    if (key == -1) { 
-                        pc -= 2; 
-                    } else { 
-                        V[(opcode & 0x0F00) >> 8] = key; 
+                    printf("LD V%01x, K", x);
+                    for (int i = 0; i < 16; i++) {
+                        if (keypad[i]) {
+                            V[x] = i;
+                            pc += opbytes;
+                            break;
+                        }
                     }
                     break;
                 case 0x0015: // set delay timer = Vx
-                    printf("LD DT, V%01x", (opcode & 0x0F00) >> 8);
-                    delayTimer = V[(opcode & 0x0F00) >> 8];
+                    printf("LD DT, V%01x", x);
+                    delayTimer = V[x];
                     break;
                 case 0x0018: // set sound timer = Vx
-                    printf("LD ST, V%01x", (opcode & 0x0F00) >> 8);
-                    soundTimer = V[(opcode & 0x0F00) >> 8];
+                    printf("LD ST, V%01x", x);
+                    soundTimer = V[x];
                     break;
                 case 0x001E: // set I = I + Vx
-                    printf("ADD I, V%01x", (opcode & 0x0F00) >> 8);
-                     uint16_t newI = I + V[(opcode & 0x0F00) >> 8]; // Soma I e VX
+                    printf("ADD I, V%01x", x);
+                     uint16_t newI = I + V[x]; // Soma I e VX
                     if (newI > 0x0FFF) { // if overflow
                         V[0xF] = 1; 
                     } else {
@@ -387,25 +349,25 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
                     I = newI; 
                     break;
                 case 0x0029: // set I = location of sprite for digit Vx
-                    printf("LD F, V%01x", (opcode & 0x0F00) >> 8);
-                    int8_t digit = V[(opcode & 0x0F00) >> 8] & 0x0F;
+                    printf("LD F, V%01x", x);
+                    int8_t digit = V[x] & 0x0F;
                     I = digit * 5;
                     break;
                 case 0x0033: // store BCD representation of Vx in memory locations I, I+1, and I+2
-                    printf("LD B, V%01x", (opcode & 0x0F00) >> 8);
-                    memory[I] = V[(opcode & 0x0F00) >> 8] / 100;
-                    memory[I + 1] = (V[(opcode & 0x0F00) >> 8] % 100) / 10;
-                    memory[I + 2] = V[(opcode & 0x0F00) >> 8] % 10;
+                    printf("LD B, V%01x", x);
+                    memory[I] = V[x] / 100;
+                    memory[I + 1] = (V[x] % 100) / 10;
+                    memory[I + 2] = V[x] % 10;
                     break;
                 case 0x0055: // store registers V0 through Vx in memory starting at location I
-                    printf("LD [I], V%01x", (opcode & 0x0F00) >> 8);
-                    for (int reg = 0; reg <= (opcode & 0x0F00) >> 8; reg++) {
+                    printf("LD [I], V%01x", x);
+                    for (int reg = 0; reg <= x; reg++) {
                         memory[I + reg] = V[reg];
                     }
                     break;
                 case 0x0065: // read registers V0 through Vx from memory starting at location I
-                    printf("LD V%01x, [I]", (opcode & 0x0F00) >> 8);
-                    for (int reg = 0; reg <= (opcode & 0x0F00) >> 8; reg++) {
+                    printf("LD V%01x, [I]", x);
+                    for (int reg = 0; reg <= x; reg++) {
                         V[reg] = memory[I + reg];
                     }
                     break;
@@ -456,6 +418,9 @@ void emulate(int fsize) {
         cpuAccumulator += frameTime;
         timerAccumulator += frameTime;
         displayAccumulator += frameTime;
+
+        // keyboard handling
+        keyHandler(keypad);
         
         while (cpuAccumulator >= cpuTickInterval) {
             if (stopLoop == 0) {
