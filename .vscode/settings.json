@@ -12,6 +12,7 @@
 		"raylib.h": "c",
 		"chrono": "c",
 		"span": "c",
-		"type_traits": "c"
+		"type_traits": "c",
+		"stdint.h": "c"
 	}
 }
