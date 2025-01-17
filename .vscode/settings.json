@@ -9,6 +9,9 @@
 		"**/*.exe": true,
 	},
 	"files.associations": {
-		"raylib.h": "c"
+		"raylib.h": "c",
+		"chrono": "c",
+		"span": "c",
+		"type_traits": "c"
 	}
 }

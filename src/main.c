@@ -1,6 +1,8 @@
 #include "raylib.h"
 
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 
@@ -9,23 +11,32 @@
 
 uint8_t display[HEIGHT * WIDTH] = {0}; // 64x32
 
+int onNextKeyPress = -1;
+
 int GetKey() {
-    if (IsKeyPressed(KEY_ONE)) return 0x1; 
-    if (IsKeyPressed(KEY_TWO)) return 0x2; 
-    if (IsKeyPressed(KEY_THREE)) return 0x3;
-    if (IsKeyPressed(KEY_FOUR)) return 0xC;
-    if (IsKeyPressed(KEY_Q)) return 0x4;
-    if (IsKeyPressed(KEY_W)) return 0x5;
-    if (IsKeyPressed(KEY_E)) return 0x6;
-    if (IsKeyPressed(KEY_R)) return 0xD;
-    if (IsKeyPressed(KEY_A)) return 0x7;
-    if (IsKeyPressed(KEY_S)) return 0x8;
-    if (IsKeyPressed(KEY_D)) return 0x9;
-    if (IsKeyPressed(KEY_F)) return 0xE;
-    if (IsKeyPressed(KEY_Z)) return 0xA;
-    if (IsKeyPressed(KEY_X)) return 0x0;
-    if (IsKeyPressed(KEY_C)) return 0xB;
-    if (IsKeyPressed(KEY_V)) return 0xF;
+	int key = GetKeyPressed();
+    if (key == (KEY_ONE)) return 0x1; 
+    if (key == (KEY_TWO)) return 0x2; 
+    if (key == (KEY_THREE)) return 0x3;
+    if (key == (KEY_FOUR)) return 0xC;
+    if (key == (KEY_Q)) return 0x4;
+    if (key == (KEY_W)) return 0x5;
+    if (key == (KEY_E)) return 0x6;
+    if (key == (KEY_R)) return 0xD;
+    if (key == (KEY_A)) return 0x7;
+    if (key == (KEY_S)) return 0x8;
+    if (key == (KEY_D)) return 0x9;
+    if (key == (KEY_F)) return 0xE;
+    if (key == (KEY_Z)) return 0xA;
+    if (key == (KEY_X)) return 0x0;
+    if (key == (KEY_C)) return 0xB;
+    if (key == (KEY_V)) return 0xF;
+
+	if (onNextKeyPress != -1 && key) {
+		onNextKeyPress = key;
+		onNextKeyPress = -1;
+	}
+
     return -1; 
 }
 
@@ -64,12 +75,18 @@ void testRender() {
     setPixel(display, 5, 2);
 }
 
-int main() {
+void play(int frequency) {
+	
+}
+
+int main(int argc, char *argv[]) {
     const int screenWidth = WIDTH * 10;
     const int screenHeight = HEIGHT * 10;
 
     InitWindow(screenWidth, screenHeight, "CHIP-8 Emulator");
-    SetTargetFPS(60);
+    InitAudioDevice();
+	
+	SetTargetFPS(60);
 
 	testRender();
 
@@ -80,6 +97,7 @@ int main() {
         EndDrawing();
     }
 
+	CloseAudioDevice();
     CloseWindow();
     return 0;
 }
