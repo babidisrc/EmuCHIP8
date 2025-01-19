@@ -23,6 +23,8 @@
 #define NUM_REGISTERS 16
 #define STACK_SIZE 16
 
+#define FONTSET_START_ADDRESS 0x050
+
 typedef struct CHIP8Registers {
     // REGISTERS
     uint8_t V[NUM_REGISTERS]; 
@@ -91,7 +93,7 @@ void initializeMemory() {
     memset(cpu.memory, 0, MEMORY_SIZE);
 
     // load fonts into memory
-    memcpy(cpu.memory, fontset, sizeof(fontset));
+    memcpy(&cpu.memory[FONTSET_START_ADDRESS], fontset, sizeof(fontset));
 }
 
 void initializeRegisters() {
@@ -342,6 +344,10 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
                         V[0xF] = 0; 
                     }
                     I = newI; 
+                    break;
+
+                case 0x0029: // LD F, Vx - set I to location of sprite for digit Vx
+                    I = FONTSET_START_ADDRESS + (V[x] * 5);
                     break;
                 
                 case 0x0033: // store BCD representation of Vx in memory locations I, I+1, and I+2
