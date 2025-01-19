@@ -16,25 +16,36 @@
 #define MEMORY_SIZE 4096
 #define PROGRAM_START 0x200 
 
-#define CPU_FREQUENCY 500  // Hz
+#define CPU_FREQUENCY 540  // Hz
 #define TIMER_FREQUENCY 60 // Hz 
 #define DISPLAY_FREQUENCY 60 // Hz
 
-uint8_t memory[MEMORY_SIZE];  
+#define NUM_REGISTERS 16
+#define STACK_SIZE 16
 
-uint16_t stack[16] = {0};
-uint8_t sp = 0; // stack pointer
+typedef struct CHIP8Registers {
+    // REGISTERS
+    uint8_t V[NUM_REGISTERS]; 
+    uint8_t soundTimer;
+    uint8_t delayTimer;
+    uint16_t I;
+} CHIP8Registers;
 
-unsigned char keypad[16] = {0};
+typedef struct CHIP8CPU {
+    uint8_t memory[MEMORY_SIZE];
+    uint16_t stack[STACK_SIZE];
+    uint8_t sp; // stack pointer
+    unsigned char keypad[16];
+    uint8_t display[HEIGHT * WIDTH]; // 64x32
+    CHIP8Registers registers;
+} CHIP8CPU;
 
-uint8_t display[HEIGHT * WIDTH] = {0}; // 64x32
+#define V cpu.registers.V
+#define I cpu.registers.I
+
+CHIP8CPU cpu;
 
 uint8_t stopLoop = 0; // stop looping (e.g. IBM Logo)
-
-// REGISTERS
-uint8_t V[16] = {0}; 
-uint8_t soundTimer = 0, delayTimer = 0;
-uint16_t I = 0;
 
 // Built-in font
 unsigned char fontset[80] = {
@@ -77,30 +88,30 @@ int keymappings[16] = {
 };
 
 void initializeMemory() {
-    memset(memory, 0, MEMORY_SIZE);
+    memset(cpu.memory, 0, MEMORY_SIZE);
 
     // load fonts into memory
-    memcpy(memory, fontset, sizeof(fontset));
+    memcpy(cpu.memory, fontset, sizeof(fontset));
 }
 
 void initializeRegisters() {
     memset(V, 0, sizeof(V)); 
-    soundTimer = 0;
-    delayTimer = 0;
+    cpu.registers.soundTimer = 0;
+    cpu.registers.delayTimer = 0;
     I = 0;
 }
 
 void pushStack(uint16_t addr) {
-    if (sp < 16) {
-        stack[sp++] = addr;
+    if (cpu.sp < 16) {
+        cpu.stack[cpu.sp++] = addr;
     } else {
         // handle stack overflow
     }
 }
 
 uint16_t popStack() {
-    if (sp > 0) {
-        return stack[--sp];
+    if (cpu.sp > 0) {
+        return cpu.stack[--cpu.sp];
     } else {
         // handle stack underflow
         return 0;
@@ -116,23 +127,21 @@ void keyHandler(unsigned char *kpad) {
 
 void setPixel(uint8_t *d, int x, int y, int n) {
 	V[0xF] = 0; // VF = 0
-    
-    // pixel wrap around to the opposite side if outside of bounds
-	if (x >= WIDTH) x -= WIDTH;
-	else if (x < 0) x += WIDTH;
-	if (y >= HEIGHT) y -= HEIGHT;
-	else if (y < 0) y += HEIGHT;
 
     for (int row = 0; row < n; row++) {
-        uint8_t spriteByte = memory[I + row];
+        uint8_t spriteByte = cpu.memory[I + row];
+        if(spriteByte == 0) continue;
+
         for (int bit = 0; bit < 8; bit++) {
             if (spriteByte & (0x80 >> bit)) { // verify if bit is ON
+
                 int pixelX = (x + bit) % WIDTH;  //  X - CHIP-8
                 int pixelY = (y + row) % HEIGHT; // Y - CHIP-8
 
                 // collision
                 int pixelLoc = pixelX + (pixelY * WIDTH);
-                if (d[pixelX + (pixelY * WIDTH)]) {
+                
+                if (d[pixelLoc]) {
                     V[0xF] = 1;
                      
                 }
@@ -152,11 +161,9 @@ void render(uint8_t d[WIDTH * HEIGHT]) {
     const int scale = 10;
 
     for (int i = 0; i < WIDTH * HEIGHT; i++) {
-        // (X,Y) - raylib screen
-        int x = (i % WIDTH) * scale;
-        int y = (i / WIDTH) * scale;
-
-        DrawRectangle(x, y, scale, scale, d[i] ? WHITE : BLACK);
+            int x = (i % WIDTH) * scale;
+            int y = (i / WIDTH) * scale;
+            DrawRectangle(x, y, scale, scale, d[i] ? WHITE : BLACK);
     }
 }
 
@@ -175,12 +182,9 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
     // Vy register, we are basically "grabbing" the y present in some
     unsigned short y = (opcode & 0x00F0) >> 4;
 
-    printf ("%04x: %04x -> ", *pc, opcode);
-
     // check the first nibble (4 bits) of the opcode
     switch (opcode & 0xF000) { // isolate the first nibble
         case 0x1000: // jump to nnn, PC = nnn
-            printf("JP 0x%03x", (opcode & 0x0FFF));
             if (*pc == (opcode & 0x0FFF)) {
                 stopLoop = 1;
             }
@@ -188,86 +192,76 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
 
             return 0;
             break;
+
         case 0x2000: // call subroutine at nnn
-            printf("CALL 0x%03x\n", (opcode & 0x0FFF)); 
             pushStack(*pc + opbytes); // push address of next instruction
             *pc = (opcode & 0x0FFF);
             return 0;
             break;
+
         case 0x3000: // skip next instruction if Vx == kk
-            printf("SE V%01x, 0x%02x", x, (opcode & 0x00FF)); 
             if (V[x] == (opcode & 0x00FF))
                 *pc += opbytes;
             break;
+
         case 0x4000: // skip next instruction if Vx != kk
-            printf("SNE V%01x, 0x%02x", x, (opcode & 0x00FF)); 
             if (V[x] != (opcode & 0x00FF))
                 *pc += opbytes;
             break;
+
         case 0x5000: // skip next instruction if Vx == Vy
-            printf("SE V%01x, V%1x", x, y); 
             if (V[x] == V[y])
                 *pc += opbytes;
             break;
+
         case 0x6000: // set Vx = kk
-            printf("LD V%01x, 0x%02x", x, (opcode & 0x00FF)); 
             V[x] = (opcode & 0x00FF);
             break;
+
         case 0x7000: // set Vx = Vx + kk
-            printf("ADD V%01x, 0x%02x", x, (opcode & 0x00FF)); 
             V[x] = (V[x] + (opcode & 0x00FF)) & 0xFF;
             break;
+
         case 0x8000:
             switch (opcode & 0x000F) { // isolate the last nibble
                 case 0x0000: // set Vx = Vy
-                    printf("LD V%01x, V%01x", x, y);
                     V[x] = V[y];
                     break;
+
                 case 0x0001: // set Vx OR Vy
-                    printf("OR V%01x, V%01x", x, y);
                     V[x] |= V[y];
                     break;
+
                 case 0x0002: // set Vx AND Vy
-                    printf("AND V%01x, V%01x", x, y);
                     V[x] &= V[y];
                     break;
+
                 case 0x0003: // set Vx XOR Vy
-                    printf("XOR V%01x, V%01x", x, y);
                     V[x] ^= V[y];
                     break;
+
                 case 0x0004: // set Vx = Vx + Vy, set VF = carry
-                    printf("ADD V%01x, V%01x", x, y);
-                    V[x] += V[y];
-                    if (V[x] > 0xFF) {
-                        V[0xF] = 1;
-                    } else {
-                        V[0xF] = 0;
-                    }
+                    uint16_t sum = V[x] + V[y];
+                    V[0xF] = (sum > 0xFF) ? 1 : 0;
+                    V[x] = sum & 0xFF;
                     break;
+
                 case 0x0005: // set Vx = Vx - Vy, set VF = NOT borrow
-                    printf("SUB V%01x, V%01x", x, y);
-                    V[x] -= V[y];
-                    if (V[x] > V[y]) {
-                        V[0xF] = 1;
-                    } else {
-                        V[0xF] = 0;
-                    }
+                    V[0xF] = (V[x] >= V[y]) ? 1 : 0;
+                    V[x] = (V[x] - V[y]) & 0xFF;
                     break;
+
                 case 0x0006: // Vx = Vx SHR 1
-                    printf("SHR V%01x {, V%01x}", x, y);
                     V[0xF] = V[x] & 0x01;
                     V[x] = V[x] >> 1;
                     break;
+
                 case 0x0007: // set Vx = Vy - Vx, set VF = NOT borrow
-                    printf("SUBN V%01x, V%01x", x, y);
-                    if (V[y] > V[x]) {
-                        V[0xF] = 1;
-                    } else {
-                        V[0xF] = 0;
-                    }
+                    V[0xF] = (V[y] >= V[x]) ? 1 : 0;
+                    V[x] = (V[y] - V[x]) & 0xFF;
                     break;
+
                 case 0x000E: // Vx = Vx SHL 1
-                    printf("SHL V%01x {, V%01x}", x, y);
                     uint8_t VX = V[x];
                     V[0xF] = VX & 0x01;
                     V[x] = VX << 1;
@@ -275,71 +269,72 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
                 default: printf("UNKNOWN"); break;
             } 
             break;
+
         case 0x9000: // skip next instruction if Vx != Vy
-            printf("SNE V%01x, V%01x", x, y); 
             if (V[x] != V[y])
                 *pc += opbytes;
             break;
+
         case 0xA000: // set I = nnn
-            printf("LD I, 0x%03x", (opcode & 0x0FFF));
             I = (opcode & 0x0FFF);
             break;
-        case 0xB000: // jump to location nnn + V0
-            printf("JP V0, 0x%03x", (opcode & 0x0FFF)); 
+
+        case 0xB000: // jump to location nnn + V0 
             *pc = (opcode & 0x0FFF) + V[0];
             return 0;
             break;
+
         case 0xC000: // set Vx = random byte (0-255) AND kk
-            printf("RND V%01x, 0x%03x", x, opcode & 0x00FF); 
             V[x] = (rand() % 256) & (opcode & 0x00FF);
             break;
+
         case 0xD000: // display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision
-            printf("DRW V%01x, V%01x, %01x", x, y, (opcode & 0x00F)); 
-            setPixel(display, V[x], V[y], (opcode & 0x00F));
+            setPixel(cpu.display, V[x], V[y], (opcode & 0x00F));
             break;
+
         case 0xE000:
             switch (opcode & 0x00FF) {
                 case 0x009E: // skip next instruction if key with the value of Vx is pressed
-                    printf("SKP V%01x", x);
-                    if (keypad[V[x]]) {
+                    if (cpu.keypad[V[x]]) {
                         *pc += opbytes;
                     }
                     break;
+
                 case 0x00A1: // skip next instruction if key with the value of Vx is NOT pressed
-                    printf("SKNP V%01x", x);
-                    if (!keypad[V[x]]) {
+                    if (!cpu.keypad[V[x]]) {
                         *pc += opbytes;
                     }
                     break;
+
                 default: printf("UNKNOWN"); break;
             } 
             break; 
+
         case 0xF000:
             switch (opcode & 0x00FF) {
                 case 0x0007: // set Vx = delay timer value
-                    printf("LD V%01x, DT", x);
-                    V[x] = delayTimer;
+                    V[x] = cpu.registers.delayTimer;
                     break;
+
                 case 0x000A: // wait for a key press, store the value of the key in Vx
-                    printf("LD V%01x, K", x);
                     for (int i = 0; i < 16; i++) {
-                        if (keypad[i]) {
+                        if (cpu.keypad[i]) {
                             V[x] = i;
                             pc += opbytes;
                             break;
                         }
                     }
                     break;
+
                 case 0x0015: // set delay timer = Vx
-                    printf("LD DT, V%01x", x);
-                    delayTimer = V[x];
+                    cpu.registers.delayTimer = V[x];
                     break;
+
                 case 0x0018: // set sound timer = Vx
-                    printf("LD ST, V%01x", x);
-                    soundTimer = V[x];
+                    cpu.registers.soundTimer = V[x];
                     break;
+
                 case 0x001E: // set I = I + Vx
-                    printf("ADD I, V%01x", x);
                      uint16_t newI = I + V[x]; // Soma I e VX
                     if (newI > 0x0FFF) { // if overflow
                         V[0xF] = 1; 
@@ -348,112 +343,99 @@ int disassembleCHIP8(unsigned char *codebuffer, int *pc, int fsize) {
                     }
                     I = newI; 
                     break;
-                case 0x0029: // set I = location of sprite for digit Vx
-                    printf("LD F, V%01x", x);
-                    int8_t digit = V[x] & 0x0F;
-                    I = digit * 5;
-                    break;
+                
                 case 0x0033: // store BCD representation of Vx in memory locations I, I+1, and I+2
-                    printf("LD B, V%01x", x);
-                    memory[I] = V[x] / 100;
-                    memory[I + 1] = (V[x] % 100) / 10;
-                    memory[I + 2] = V[x] % 10;
+                    cpu.memory[I] = V[x] / 100;
+                    cpu.memory[I + 1] = (V[x] % 100) / 10;
+                    cpu.memory[I + 2] = V[x] % 10;
                     break;
+
                 case 0x0055: // store registers V0 through Vx in memory starting at location I
-                    printf("LD [I], V%01x", x);
                     for (int reg = 0; reg <= x; reg++) {
-                        memory[I + reg] = V[reg];
+                        cpu.memory[I + reg] = V[reg];
                     }
                     break;
+
                 case 0x0065: // read registers V0 through Vx from memory starting at location I
-                    printf("LD V%01x, [I]", x);
                     for (int reg = 0; reg <= x; reg++) {
-                        V[reg] = memory[I + reg];
+                        V[reg] = cpu.memory[I + reg];
                     }
                     break;
+
                 default: printf("UNKNOWN"); break;
             } 
             break; 
         case 0x0000:
             switch (opcode) {
                 case 0x00E0: // clear display
-                    printf("CLS\n"); 
-                    clear(display);
+                    clear(cpu.display);
                     break; 
+
                 case 0x00EE: 
-                    printf("RET\n"); 
                     *pc = popStack();
                     return 0;
                     break; // return from a subroutine
-                default: 
-                    printf("SYS 0x%03x\n", (opcode & 0x0FFF)); 
-                    break; // jump to a machine code routine at nnn - ignored by modern interpreters
+                
+                default: printf("UNKNOWN"); break;
             }
             break;
         default: printf("UNKNOWN"); break;
     }
 
-    printf("\n");
-
     return opbytes;
 }
 
 void emulate(int fsize) {
-    const double cpuTickInterval = 1.0 / CPU_FREQUENCY;
-    const double timerTickInterval = 1.0 / TIMER_FREQUENCY;
-    const double displayTickInterval = 1.0 / DISPLAY_FREQUENCY;
-    
+    const double timeStep = 1.0 / 60.0;
     double lastTime = GetTime();
-    double cpuAccumulator = 0.0;
-    double timerAccumulator = 0.0;
-    double displayAccumulator = 0.0;
-    
     int pc = PROGRAM_START;
 
     while (!WindowShouldClose()) {
         double currentTime = GetTime();
         double frameTime = currentTime - lastTime;
         lastTime = currentTime;
-        
-        cpuAccumulator += frameTime;
-        timerAccumulator += frameTime;
-        displayAccumulator += frameTime;
 
         // keyboard handling
-        keyHandler(keypad);
+        keyHandler(cpu.keypad);
+
+        int cpuCycles = (int)(frameTime * CPU_FREQUENCY);
         
-        while (cpuAccumulator >= cpuTickInterval) {
-            if (stopLoop == 0) {
-                int increment = disassembleCHIP8(&memory[PROGRAM_START], &pc, fsize);
-                pc += increment;
-            }
-            cpuAccumulator -= cpuTickInterval;
+        for(int i = 0; i < cpuCycles && !stopLoop; i++) {
+            int increment = disassembleCHIP8(&cpu.memory[PROGRAM_START], &pc, fsize);
+            pc += increment;
         }
         
         // update timers
-        while (timerAccumulator >= timerTickInterval) {
-            if (delayTimer > 0) {
-                delayTimer--;
-            }
-            if (soundTimer > 0) {
-                soundTimer--;
-            }
-            timerAccumulator -= timerTickInterval;
+        if(frameTime >= timeStep) {
+            if(cpu.registers.delayTimer > 0) cpu.registers.delayTimer--;
+            if(cpu.registers.soundTimer > 0) cpu.registers.soundTimer--;
         }
         
         // render screen
-        if (displayAccumulator >= displayTickInterval) {
-            BeginDrawing();
-            render(display);
-            EndDrawing();
-            displayAccumulator -= displayTickInterval;
-        }
+        BeginDrawing();
+        render(cpu.display);
+        EndDrawing();
     }
 }
 
 void fatal(char *message) {
     printf("%s\n", message);
     exit(1);
+}
+
+int loadROM(char rom[]) {
+    FILE *f= fopen(rom, "rb");    
+    if (f == NULL) fatal("error: Couldn't open file");     
+
+    // get the file size and read it into a memory buffer    
+    fseek(f, 0L, SEEK_END);    
+    int fsize = ftell(f);    
+    fseek(f, 0L, SEEK_SET);
+
+    fread(&cpu.memory[PROGRAM_START], fsize, 1, f);
+    fclose(f);
+
+    return fsize;
 }
 
 int main(int argc, char *argv[]) {
@@ -469,16 +451,9 @@ int main(int argc, char *argv[]) {
 
 	if (argc != 2) fatal("Usage: ./EmuCHIP8 <romfile> ");
 
-    FILE *f= fopen(argv[1], "rb");    
-    if (f == NULL) fatal("error: Couldn't open file");     
+    initializeMemory();
 
-    // get the file size and read it into a memory buffer    
-    fseek(f, 0L, SEEK_END);    
-    int fsize = ftell(f);    
-    fseek(f, 0L, SEEK_SET);
-
-    fread(&memory[PROGRAM_START], fsize, 1, f);
-    fclose(f);
+    int fsize = loadROM(argv[1]);
 
     initializeRegisters();
 
